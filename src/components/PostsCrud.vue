@@ -17,8 +17,28 @@
       :total-posts="totalPosts"
       :items-per-page="itemsPerPage"
       @edit="handleEdit"
-      @delete="handleDelete"
+      @delete="showDeleteModal"
       @page-change="handlePageChange"
+    />
+
+    <ConfirmModal
+      :show="deleteModal.show"
+      :loading="deleteModal.loading"
+      title="Удаление поста"
+      message="Вы уверены, что хотите удалить этот пост? Это действие нельзя отменить."
+      confirm-text="Удалить"
+      cancel-text="Отмена"
+      @confirm="confirmDelete"
+      @cancel="cancelDelete"
+    />
+
+    <Toast
+      v-for="toast in toasts"
+      :key="toast.id"
+      :message="toast.message"
+      :type="toast.type"
+      :show="toast.show"
+      @close="removeToast(toast.id)"
     />
   </div>
 </template>
@@ -27,6 +47,8 @@
 import { ref, onMounted } from 'vue'
 import PostForm from './PostForm.vue'
 import PostList from './PostList.vue'
+import ConfirmModal from './ConfirmModal.vue'
+import Toast from './Toast.vue'
 
 const posts = ref([])
 const users = ref([])
@@ -36,7 +58,33 @@ const currentPage = ref(1)
 const totalPosts = ref(0)
 const itemsPerPage = ref(5)
 
+const deleteModal = ref({
+  show: false,
+  loading: false,
+  postId: null
+})
+
+const toasts = ref([])
+let toastIdCounter = 0
+
 const API_BASE = 'https://jsonplaceholder.typicode.com'
+
+const showToast = (message, type = 'info') => {
+  const toast = {
+    id: ++toastIdCounter,
+    message,
+    type,
+    show: true
+  }
+  toasts.value.push(toast)
+}
+
+const removeToast = (id) => {
+  const index = toasts.value.findIndex(toast => toast.id === id)
+  if (index !== -1) {
+    toasts.value.splice(index, 1)
+  }
+}
 
 const fetchPosts = async (page = 1) => {
   loading.value = true
@@ -54,7 +102,7 @@ const fetchPosts = async (page = 1) => {
     }
   } catch (error) {
     console.error('Ошибка при загрузке постов:', error)
-    alert('Ошибка при загрузке постов')
+    showToast('Ошибка при загрузке постов', 'error')
   } finally {
     loading.value = false
   }
@@ -66,6 +114,7 @@ const fetchUsers = async () => {
     users.value = await response.json()
   } catch (error) {
     console.error('Ошибка при загрузке пользователей:', error)
+    showToast('Ошибка при загрузке пользователей', 'error')
   }
 }
 
@@ -91,10 +140,10 @@ const createPost = async (postData) => {
     }
 
     totalPosts.value++
-    alert('Пост успешно создан!')
+    showToast('Пост успешно создан!', 'success')
   } catch (error) {
     console.error('Ошибка при создании поста:', error)
-    alert('Ошибка при создании поста')
+    showToast('Ошибка при создании поста', 'error')
   } finally {
     loading.value = false
   }
@@ -117,21 +166,17 @@ const updatePost = async (id, postData) => {
       posts.value[index] = updatedPost
     }
 
-    alert('Пост успешно обновлен!')
+    showToast('Пост успешно обновлен!', 'success')
   } catch (error) {
     console.error('Ошибка при обновлении поста:', error)
-    alert('Ошибка при обновлении поста')
+    showToast('Ошибка при обновлении поста', 'error')
   } finally {
     loading.value = false
   }
 }
 
 const deletePost = async (id) => {
-  if (!confirm('Вы уверены, что хотите удалить этот пост?')) {
-    return
-  }
-
-  loading.value = true
+  deleteModal.value.loading = true
   try {
     await fetch(`${API_BASE}/posts/${id}`, {
       method: 'DELETE'
@@ -148,13 +193,31 @@ const deletePost = async (id) => {
       await fetchPosts(currentPage.value)
     }
 
-    alert('Пост успешно удален!')
+    showToast('Пост успешно удален!', 'success')
   } catch (error) {
     console.error('Ошибка при удалении поста:', error)
-    alert('Ошибка при удалении поста')
+    showToast('Ошибка при удалении поста', 'error')
   } finally {
-    loading.value = false
+    deleteModal.value.loading = false
+    deleteModal.value.show = false
+    deleteModal.value.postId = null
   }
+}
+
+const showDeleteModal = (postId) => {
+  deleteModal.value.show = true
+  deleteModal.value.postId = postId
+}
+
+const confirmDelete = () => {
+  if (deleteModal.value.postId) {
+    deletePost(deleteModal.value.postId)
+  }
+}
+
+const cancelDelete = () => {
+  deleteModal.value.show = false
+  deleteModal.value.postId = null
 }
 
 const handleFormSubmit = async (formData) => {
@@ -176,7 +239,7 @@ const handleEdit = (post) => {
 }
 
 const handleDelete = (postId) => {
-  deletePost(postId)
+  showDeleteModal(postId)
 }
 
 const handlePageChange = async (page) => {
