@@ -67,24 +67,22 @@ const form = ref({
   userId: 1
 })
 
-const handleSubmit = () => {
-  emit('submit', { ...form.value })
-  if (!props.editingPost) {
-    form.value = {
-      title: '',
-      body: '',
-      userId: 1
-    }
-  }
-}
-
-const handleCancel = () => {
-  emit('cancel')
+const resetForm = () => {
   form.value = {
     title: '',
     body: '',
     userId: 1
   }
+}
+
+const handleSubmit = () => {
+  emit('submit', { ...form.value })
+  resetForm()
+}
+
+const handleCancel = () => {
+  emit('cancel')
+  resetForm()
 }
 
 watch(() => props.editingPost, (newPost) => {
@@ -94,6 +92,8 @@ watch(() => props.editingPost, (newPost) => {
       body: newPost.body,
       userId: newPost.userId
     }
+  } else {
+    resetForm()
   }
 })
 </script>
